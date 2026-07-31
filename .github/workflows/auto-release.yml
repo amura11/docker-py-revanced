@@ -10,7 +10,7 @@ on:
         description: "Upload Non Rooted APKs to Telegram"
         required: false
         type: boolean
-        default: true
+        default: false
   schedule:
     - cron: '0 */12 * * *'
 jobs:
