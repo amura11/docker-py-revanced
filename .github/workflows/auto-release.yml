@@ -12,7 +12,7 @@ on:
         type: boolean
         default: false
   schedule:
-    - cron: '0 */12 * * *'
+    - cron: '0 0 * * MON'
 jobs:
   release-check:
     permissions: write-all
