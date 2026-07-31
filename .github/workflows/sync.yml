@@ -1,0 +1,25 @@
+name: Sync Fork with Upstream
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Merge upstream
+        run: |
+          git remote add upstream https://github.com/nikhilbadyal/docker-py-revanced.git
+          git fetch upstream
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git merge upstream/main --no-edit
+          git push origin main
