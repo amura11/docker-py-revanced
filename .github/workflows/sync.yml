@@ -11,10 +11,25 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      - name: Resolve PAT
+        id: resolve_pat
+        env:
+          ENVS: ${{ secrets.ENVS }}
+          PERSONAL_ACCESS_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+        run: |
+          # An ENVS-embedded PERSONAL_ACCESS_TOKEN always wins (backwards compat); only fall back
+          # to the dedicated secret when unset/empty. Mirrors build-artifact.yml's logic.
+          existing_pat=$(echo "${ENVS}" | grep '^PERSONAL_ACCESS_TOKEN=' | tail -n1 | cut -d'=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e "s/^['\"]//" -e "s/['\"]$//" || true)
+          token="${existing_pat:-$PERSONAL_ACCESS_TOKEN}"
+          if [ -n "${token}" ]; then
+            echo "::add-mask::${token}"
+          fi
+          echo "token=${token}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GH_PAT }}
+          token: ${{ steps.resolve_pat.outputs.token }}
       - name: Merge upstream
         run: |
           git remote add upstream https://github.com/nikhilbadyal/docker-py-revanced.git
