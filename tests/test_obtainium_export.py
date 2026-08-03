@@ -116,15 +116,24 @@ class ObtainiumExportTests(TestCase):
             updates_info = {
                 "YouTube": {
                     "app_version": "20.47.62",
+                    "patches_versions": ["v1.0.0"],
                     "output_file_name": "ReYouTube-Version20.47.62-PatchVersionv1.0.0-PatchSetabc123-output.apk",
                     "app_dump": {"package_name": "app.revanced.android.youtube"},
                 },
             }
 
             generate_obtainium_export(updates_info, config)
-            index_content = Path(temp_dir, "obtainium_sources", "index.html").read_text(encoding="utf_8")
+            index_content = Path(temp_dir, "index.html").read_text(encoding="utf_8")
 
         self.assertIn('<span class="app-name">YouTube</span>', index_content)
+        self.assertIn('<code class="package-name">app.revanced.android.youtube</code>', index_content)
+        self.assertIn('<span class="meta-chip">App 20.47.62</span>', index_content)
+        self.assertIn('<span class="meta-chip">Patch v1.0.0</span>', index_content)
+        self.assertIn(
+            'class="source-link" href="https://raw.githubusercontent.com/owner/repo/changelogs/'
+            'obtainium_sources/youtube.html"',
+            index_content,
+        )
         self.assertIn("https://github.com/ImranR98/Obtainium", index_content)
         deep_link_match = re.search(r'href="(obtainium://app/[^"]+)"', index_content)
         self.assertIsNotNone(deep_link_match)
@@ -164,7 +173,7 @@ class ObtainiumExportTests(TestCase):
             }
 
             generate_obtainium_export(updates_info, config)
-            index_path = Path(temp_dir, "obtainium_sources", "index.html")
+            index_path = Path(temp_dir, "index.html")
 
         self.assertFalse(index_path.exists())
 
