@@ -32,7 +32,7 @@ jobs:
       # a reusable workflow call's `with:` mapping (only github, needs, strategy, matrix, inputs,
       # vars are).
       SCHEDULED_TELEGRAM_NO_ROOT_UPLOAD: false
-      SCHEDULED_DELETE_OLDER_RELEASES: true
+      SCHEDULED_DELETE_OLDER_RELEASES: false
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
