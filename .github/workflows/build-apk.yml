@@ -93,6 +93,7 @@ concurrency:
   group: ${{ github.head_ref || github.run_id }}
   cancel-in-progress: true
 jobs:
+  # Compute the release tag once up-front so build-artifact.yml can pass it into the Obtainium export before docker runs.
   compute-tag:
     runs-on: ubuntu-latest
     permissions: {}
