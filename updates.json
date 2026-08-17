@@ -1,1 +1,358 @@
-{}
+{
+    "projectivity": {
+        "app_version": "4.70",
+        "patches_versions": [
+            "v1.48.0"
+        ],
+        "cli_version": "v1.13.0",
+        "ms_epoch_since_patched": 1786950513082,
+        "date_patched": "2026-08-17 07:08:33.081684+05:30",
+        "app_dump": {
+            "app_name": "projectivity",
+            "app_version": "4.70",
+            "experiment": false,
+            "cli_dl": "https://github.com/MorpheApp/morphe-desktop",
+            "patches_dl_list": [
+                "https://github.com/arandomhooman/hoomans-morphe-patches/releases/latest"
+            ],
+            "patches_dl": "https://github.com/arandomhooman/hoomans-morphe-patches/releases/latest",
+            "exclude_request": [],
+            "include_request": [],
+            "resource": {
+                "cli": {
+                    "file_name": "537c8f39e05ead47782cf3065b6b75020e2cd5b10c7a6327ef9a3ced02b4c797.jar",
+                    "version": "v1.13.0"
+                },
+                "patches": {
+                    "file_name": "db6c691016e739ff80235333811b8ab212ef55c81dd5fccc512650f99edf45db.mpp",
+                    "version": "v1.48.0"
+                }
+            },
+            "patch_bundles": [
+                {
+                    "name": "patches",
+                    "file_name": "db6c691016e739ff80235333811b8ab212ef55c81dd5fccc512650f99edf45db.mpp",
+                    "version": "v1.48.0"
+                }
+            ],
+            "no_of_patches": 1,
+            "keystore_name": "revanced.keystore",
+            "archs_to_build": [],
+            "options_file": "options.json",
+            "download_file_name": "projectivity.apkm",
+            "download_dl": "https://www.apkmirror.com/wp-content/themes/APKMirror/download.php?id=14540802&key=662b32a4e70c4b6e42c7d807dd8b8b70f5d51527",
+            "download_source": "https://www.apkmirror.com/apk/spocky/projectivy-launcher-android-tv",
+            "package_name": "com.spocky.projengmenu",
+            "old_key": true,
+            "patches": [],
+            "space_formatted": true,
+            "cli_argsf": "morphe-cli",
+            "effective_cli_argsf": "morphe-cli",
+            "cli_lpargs": "",
+            "cli_pargs": "",
+            "cli_lp_args": {
+                "CMD": "list-patches",
+                "DESCRIPTIONS": "",
+                "FILTER_PACKAGE_NAME": "",
+                "INDEX": "-i",
+                "OPTIONS": "-o",
+                "PACKAGES": "-p",
+                "PATCHES": "--patches",
+                "PATCHES_POST": "",
+                "TEMPORARY_FILES_PATH": "",
+                "UNIVERSAL": "-u",
+                "VERSIONS": "-v"
+            },
+            "cli_p_args": {
+                "APK": "__POSITIONAL__",
+                "CMD": "patch",
+                "CONTINUE_ON_ERROR": "--continue-on-error",
+                "DISABLED": "-d",
+                "ENABLED": "-e",
+                "EXCLUSIVE": "--exclusive",
+                "FORCE": "--force",
+                "KEYSTORE": "--keystore",
+                "KEYSTORE_ENTRY_ALIAS": "--keystore-entry-alias=alias",
+                "KEYSTORE_ENTRY_PASSWORD": "--keystore-entry-password=ReVanced",
+                "KEYSTORE_PASSWORD": "--keystore-password=ReVanced",
+                "OPTIONS": "-O",
+                "OUTPUT": "-o",
+                "PATCHES": "-p",
+                "PATCHES_POST": "",
+                "PURGE": "",
+                "RIP_LIB": "",
+                "STRIPLIBS": "--striplibs",
+                "TEMPORARY_FILES_PATH": "-t"
+            },
+            "_cached_output_file_name": "Reprojectivity-Version4.70-PatchVersionv1.48.0-PatchSet73c0c7576e07-2026AUG17.0708AM-output.apk"
+        },
+        "output_file_name": "Reprojectivity-Version4.70-PatchVersionv1.48.0-PatchSet73c0c7576e07-2026AUG17.0708AM-output.apk"
+    },
+    "reddit": {
+        "app_version": "2026.14.0",
+        "patches_versions": [
+            "v1.39.1"
+        ],
+        "cli_version": "v1.13.0",
+        "ms_epoch_since_patched": 1786417963479,
+        "date_patched": "2026-08-11 03:12:43.479169+05:30",
+        "app_dump": {
+            "app_name": "reddit",
+            "app_version": "2026.14.0",
+            "experiment": false,
+            "cli_dl": "https://github.com/MorpheApp/morphe-desktop",
+            "patches_dl_list": [
+                "https://github.com/MorpheApp/morphe-patches/releases/latest"
+            ],
+            "patches_dl": "https://github.com/MorpheApp/morphe-patches/releases/latest",
+            "exclude_request": [],
+            "include_request": [],
+            "resource": {
+                "cli": {
+                    "file_name": "537c8f39e05ead47782cf3065b6b75020e2cd5b10c7a6327ef9a3ced02b4c797.jar",
+                    "version": "v1.13.0"
+                },
+                "patches": {
+                    "file_name": "dcbba4c8cef1e77d47a55cf573a2cd0057024b6ebc4917281aa8badaa0007409.mpp",
+                    "version": "v1.39.1"
+                }
+            },
+            "patch_bundles": [
+                {
+                    "name": "patches",
+                    "file_name": "dcbba4c8cef1e77d47a55cf573a2cd0057024b6ebc4917281aa8badaa0007409.mpp",
+                    "version": "v1.39.1"
+                }
+            ],
+            "no_of_patches": 18,
+            "keystore_name": "revanced.keystore",
+            "archs_to_build": [],
+            "options_file": "options.json",
+            "download_file_name": "reddit.apkm",
+            "download_dl": "https://www.apkmirror.com/wp-content/themes/APKMirror/download.php?id=13245268&key=1d7920e5824b3b90e4cba397038eb0952f9f1288",
+            "download_source": "https://www.apkmirror.com/apk/redditinc/reddit/",
+            "package_name": "com.reddit.frontpage",
+            "old_key": true,
+            "patches": [],
+            "space_formatted": true,
+            "cli_argsf": "morphe-cli",
+            "effective_cli_argsf": "morphe-cli",
+            "cli_lpargs": "",
+            "cli_pargs": "",
+            "cli_lp_args": {
+                "CMD": "list-patches",
+                "DESCRIPTIONS": "",
+                "FILTER_PACKAGE_NAME": "",
+                "INDEX": "-i",
+                "OPTIONS": "-o",
+                "PACKAGES": "-p",
+                "PATCHES": "--patches",
+                "PATCHES_POST": "",
+                "TEMPORARY_FILES_PATH": "",
+                "UNIVERSAL": "-u",
+                "VERSIONS": "-v"
+            },
+            "cli_p_args": {
+                "APK": "__POSITIONAL__",
+                "CMD": "patch",
+                "CONTINUE_ON_ERROR": "--continue-on-error",
+                "DISABLED": "-d",
+                "ENABLED": "-e",
+                "EXCLUSIVE": "--exclusive",
+                "FORCE": "--force",
+                "KEYSTORE": "--keystore",
+                "KEYSTORE_ENTRY_ALIAS": "--keystore-entry-alias=alias",
+                "KEYSTORE_ENTRY_PASSWORD": "--keystore-entry-password=ReVanced",
+                "KEYSTORE_PASSWORD": "--keystore-password=ReVanced",
+                "OPTIONS": "-O",
+                "OUTPUT": "-o",
+                "PATCHES": "-p",
+                "PATCHES_POST": "",
+                "PURGE": "",
+                "RIP_LIB": "",
+                "STRIPLIBS": "--striplibs",
+                "TEMPORARY_FILES_PATH": "-t"
+            },
+            "_cached_output_file_name": "Rereddit-Version2026.14.0-PatchVersionv1.39.1-PatchSet790d98cf2db0-2026AUG11.0312AM-output.apk"
+        },
+        "output_file_name": "Rereddit-Version2026.14.0-PatchVersionv1.39.1-PatchSet790d98cf2db0-2026AUG11.0312AM-output.apk"
+    },
+    "youtube": {
+        "app_version": "21.04.223",
+        "patches_versions": [
+            "v1.39.1"
+        ],
+        "cli_version": "v1.13.0",
+        "ms_epoch_since_patched": 1786417970148,
+        "date_patched": "2026-08-11 03:12:50.151041+05:30",
+        "app_dump": {
+            "app_name": "youtube",
+            "app_version": "21.04.223",
+            "experiment": false,
+            "cli_dl": "https://github.com/MorpheApp/morphe-desktop",
+            "patches_dl_list": [
+                "https://github.com/MorpheApp/morphe-patches/releases/latest"
+            ],
+            "patches_dl": "https://github.com/MorpheApp/morphe-patches/releases/latest",
+            "exclude_request": [],
+            "include_request": [],
+            "resource": {
+                "cli": {
+                    "file_name": "537c8f39e05ead47782cf3065b6b75020e2cd5b10c7a6327ef9a3ced02b4c797.jar",
+                    "version": "v1.13.0"
+                },
+                "patches": {
+                    "file_name": "dcbba4c8cef1e77d47a55cf573a2cd0057024b6ebc4917281aa8badaa0007409.mpp",
+                    "version": "v1.39.1"
+                }
+            },
+            "patch_bundles": [
+                {
+                    "name": "patches",
+                    "file_name": "dcbba4c8cef1e77d47a55cf573a2cd0057024b6ebc4917281aa8badaa0007409.mpp",
+                    "version": "v1.39.1"
+                }
+            ],
+            "no_of_patches": 75,
+            "keystore_name": "revanced.keystore",
+            "archs_to_build": [],
+            "options_file": "options.json",
+            "download_file_name": "youtube.apk",
+            "download_dl": "https://www.apkmirror.com/wp-content/themes/APKMirror/download.php?id=12341062&key=5d3d1b56b52a57a88ac9847f1b725a7dd879e7e5&forcebaseapk=true",
+            "download_source": "https://www.apkmirror.com/apk/google-inc/youtube/",
+            "package_name": "com.google.android.youtube",
+            "old_key": true,
+            "patches": [],
+            "space_formatted": true,
+            "cli_argsf": "morphe-cli",
+            "effective_cli_argsf": "morphe-cli",
+            "cli_lpargs": "",
+            "cli_pargs": "",
+            "cli_lp_args": {
+                "CMD": "list-patches",
+                "DESCRIPTIONS": "",
+                "FILTER_PACKAGE_NAME": "",
+                "INDEX": "-i",
+                "OPTIONS": "-o",
+                "PACKAGES": "-p",
+                "PATCHES": "--patches",
+                "PATCHES_POST": "",
+                "TEMPORARY_FILES_PATH": "",
+                "UNIVERSAL": "-u",
+                "VERSIONS": "-v"
+            },
+            "cli_p_args": {
+                "APK": "__POSITIONAL__",
+                "CMD": "patch",
+                "CONTINUE_ON_ERROR": "--continue-on-error",
+                "DISABLED": "-d",
+                "ENABLED": "-e",
+                "EXCLUSIVE": "--exclusive",
+                "FORCE": "--force",
+                "KEYSTORE": "--keystore",
+                "KEYSTORE_ENTRY_ALIAS": "--keystore-entry-alias=alias",
+                "KEYSTORE_ENTRY_PASSWORD": "--keystore-entry-password=ReVanced",
+                "KEYSTORE_PASSWORD": "--keystore-password=ReVanced",
+                "OPTIONS": "-O",
+                "OUTPUT": "-o",
+                "PATCHES": "-p",
+                "PATCHES_POST": "",
+                "PURGE": "",
+                "RIP_LIB": "",
+                "STRIPLIBS": "--striplibs",
+                "TEMPORARY_FILES_PATH": "-t"
+            },
+            "_cached_output_file_name": "Reyoutube-Version21.04.223-PatchVersionv1.39.1-PatchSet790d98cf2db0-2026AUG11.0312AM-output.apk"
+        },
+        "output_file_name": "Reyoutube-Version21.04.223-PatchVersionv1.39.1-PatchSet790d98cf2db0-2026AUG11.0312AM-output.apk"
+    },
+    "tiktok": {
+        "app_version": "46.4.3.2024604030",
+        "patches_versions": [
+            "v0.6.1"
+        ],
+        "cli_version": "v1.13.0",
+        "ms_epoch_since_patched": 1786417955645,
+        "date_patched": "2026-08-11 03:12:35.644971+05:30",
+        "app_dump": {
+            "app_name": "tiktok",
+            "app_version": "46.4.3.2024604030",
+            "experiment": false,
+            "cli_dl": "https://github.com/MorpheApp/morphe-desktop",
+            "patches_dl_list": [
+                "https://github.com/icysymmetra/tiktok-patches-for-morphe/releases/latest"
+            ],
+            "patches_dl": "https://github.com/icysymmetra/tiktok-patches-for-morphe/releases/latest",
+            "exclude_request": [],
+            "include_request": [],
+            "resource": {
+                "cli": {
+                    "file_name": "537c8f39e05ead47782cf3065b6b75020e2cd5b10c7a6327ef9a3ced02b4c797.jar",
+                    "version": "v1.13.0"
+                },
+                "patches": {
+                    "file_name": "0bc90b0511fd49cc67ee6dd7e40f25b7b4b437a91e689cd277fcd494861b4df7.mpp",
+                    "version": "v0.6.1"
+                }
+            },
+            "patch_bundles": [
+                {
+                    "name": "patches",
+                    "file_name": "0bc90b0511fd49cc67ee6dd7e40f25b7b4b437a91e689cd277fcd494861b4df7.mpp",
+                    "version": "v0.6.1"
+                }
+            ],
+            "no_of_patches": 0,
+            "keystore_name": "revanced.keystore",
+            "archs_to_build": [],
+            "options_file": "options.json",
+            "download_file_name": "tiktok.apk",
+            "download_dl": "https://www.apkmirror.com/wp-content/themes/APKMirror/download.php?id=15297181&key=f64931c763611903769e960bebe3f38096a81687&forcebaseapk=true",
+            "download_source": "https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/",
+            "package_name": "com.ss.android.ugc.trill",
+            "old_key": true,
+            "patches": [],
+            "space_formatted": true,
+            "cli_argsf": "morphe-cli",
+            "effective_cli_argsf": "morphe-cli",
+            "cli_lpargs": "",
+            "cli_pargs": "",
+            "cli_lp_args": {
+                "CMD": "list-patches",
+                "DESCRIPTIONS": "",
+                "FILTER_PACKAGE_NAME": "",
+                "INDEX": "-i",
+                "OPTIONS": "-o",
+                "PACKAGES": "-p",
+                "PATCHES": "--patches",
+                "PATCHES_POST": "",
+                "TEMPORARY_FILES_PATH": "",
+                "UNIVERSAL": "-u",
+                "VERSIONS": "-v"
+            },
+            "cli_p_args": {
+                "APK": "__POSITIONAL__",
+                "CMD": "patch",
+                "CONTINUE_ON_ERROR": "--continue-on-error",
+                "DISABLED": "-d",
+                "ENABLED": "-e",
+                "EXCLUSIVE": "--exclusive",
+                "FORCE": "--force",
+                "KEYSTORE": "--keystore",
+                "KEYSTORE_ENTRY_ALIAS": "--keystore-entry-alias=alias",
+                "KEYSTORE_ENTRY_PASSWORD": "--keystore-entry-password=ReVanced",
+                "KEYSTORE_PASSWORD": "--keystore-password=ReVanced",
+                "OPTIONS": "-O",
+                "OUTPUT": "-o",
+                "PATCHES": "-p",
+                "PATCHES_POST": "",
+                "PURGE": "",
+                "RIP_LIB": "",
+                "STRIPLIBS": "--striplibs",
+                "TEMPORARY_FILES_PATH": "-t"
+            },
+            "_cached_output_file_name": "Retiktok-Version46.4.3.2024604030-PatchVersionv0.6.1-PatchSetfb8f351a69e8-2026AUG11.0312AM-output.apk"
+        },
+        "output_file_name": "Retiktok-Version46.4.3.2024604030-PatchVersionv0.6.1-PatchSetfb8f351a69e8-2026AUG11.0312AM-output.apk"
+    }
+}
