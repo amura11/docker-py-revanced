@@ -18,7 +18,7 @@ from environs import Env
 
 from src.app import APP
 from src.config import RevancedConfig
-from src.utils import generate_obtainium_export
+from src.utils import generate_obtainium_export, save_patch_info
 
 
 class _Env:
@@ -176,6 +176,58 @@ class ObtainiumExportTests(TestCase):
             index_path = Path(temp_dir, "index.html")
 
         self.assertFalse(index_path.exists())
+
+    def test_save_patch_info_records_the_release_tag_the_app_was_built_under(self: Self) -> None:
+        """Each app's persisted metadata should pin the tag its asset was actually uploaded under."""
+        app = _app_with_patch_bundles("v2.0.0")
+        app.resource = {"cli": {"version": "1.0.0"}}
+        config = cast("RevancedConfig", SimpleNamespace(obtainium_github_tag="Build-1"))
+
+        updates_info = save_patch_info(app, {}, config)
+
+        self.assertEqual(updates_info["youtube"]["obtainium_github_tag"], "Build-1")
+
+    def test_generate_obtainium_export_uses_each_apps_own_persisted_tag(self: Self) -> None:
+        """An app not rebuilt this run must keep linking to the release its own asset lives under.
+
+        Regression test for the bug where every app's HTML was rewritten to the current run's tag on
+        every run, even for apps whose asset was never uploaded to that release.
+        """
+        with TemporaryDirectory() as temp_dir, chdir(temp_dir):
+            config = cast(
+                "RevancedConfig",
+                SimpleNamespace(
+                    obtainium_export=True,
+                    obtainium_github_tag="Build-2",
+                    obtainium_site_export=False,
+                    env=_Env("owner/repo"),
+                ),
+            )
+            updates_info = {
+                # Not rebuilt this run; its asset only exists under its own older release.
+                "AppA": {
+                    "output_file_name": "AppA-output.apk",
+                    "obtainium_github_tag": "Build-1",
+                },
+                # Rebuilt this run, matching the live config tag.
+                "AppB": {
+                    "output_file_name": "AppB-output.apk",
+                    "obtainium_github_tag": "Build-2",
+                },
+                # Predates this field; only the live config tag is available for it.
+                "AppC": {
+                    "output_file_name": "AppC-output.apk",
+                },
+            }
+
+            generate_obtainium_export(updates_info, config)
+            app_a_html = Path(temp_dir, "obtainium_sources", "appa.html").read_text(encoding="utf_8")
+            app_b_html = Path(temp_dir, "obtainium_sources", "appb.html").read_text(encoding="utf_8")
+            app_c_html = Path(temp_dir, "obtainium_sources", "appc.html").read_text(encoding="utf_8")
+
+        self.assertIn("/releases/download/Build-1/AppA-output.apk", app_a_html)
+        self.assertIn("/releases/download/Build-2/AppB-output.apk", app_b_html)
+        self.assertIn("/releases/download/Build-2/AppC-output.apk", app_c_html)
 
     def test_default_version_extraction_regex_handles_optional_patch_prefix(self: Self) -> None:
         """The shipped default regex must match patch bundle versions with or without a leading 'v'."""
