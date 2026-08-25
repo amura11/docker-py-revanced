@@ -29,7 +29,13 @@ class RevancedConfig(object):
         self.extra_download_files: list[str] = env.list("EXTRA_FILES", [])
         self.apk_editor = "apkeditor-output.jar"
         self.extra_download_files.append("https://github.com/REAndroid/APKEditor@apkeditor.jar")
-        self.apps = sorted(env.list("PATCH_APPS", default_build))
+        # The full roster this project is configured to build - stable across every run, even a
+        # partial one - so callers like the Obtainium export can tell "requested" from "built now".
+        self.all_apps = sorted(env.list("PATCH_APPS", default_build))
+        # A partial run (e.g. "only apps with updates") narrows this to a subset via PATCH_APPS_OVERRIDE
+        # instead of mutating PATCH_APPS itself, so all_apps above never loses the full roster.
+        override_apps: list[str] = env.list("PATCH_APPS_OVERRIDE", [])
+        self.apps = sorted(override_apps) if override_apps else self.all_apps
         self.global_old_key = env.bool("GLOBAL_OLD_KEY", True)
         self.global_space_formatted = env.bool("GLOBAL_SPACE_FORMATTED_PATCHES", True)
         # This profile controls the default CLI flag family (revanced v5/v6/morphe) for all apps.

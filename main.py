@@ -100,14 +100,12 @@ def _process_apps_sequentially(
     caches: AppCaches,
     updates_info: dict[str, Any],
     failed_apps: list[str],
-    rebuilt_apps: set[str],
 ) -> None:
     """Process apps one-by-one for single-app and CI-test runs."""
     for app_name in config.apps:
         try:
             app_updates = process_single_app(app_name, config, caches)
             updates_info.update(app_updates)
-            rebuilt_apps.update(app_updates)
         except Exception as e:  # noqa: BLE001
             _record_failed_app(app_name, e, failed_apps)
 
@@ -117,7 +115,6 @@ def _process_apps_in_parallel(
     caches: AppCaches,
     updates_info: dict[str, Any],
     failed_apps: list[str],
-    rebuilt_apps: set[str],
 ) -> None:
     """Process apps with worker concurrency while preserving aggregate failure reporting."""
     # Worker count is capped by app count and operator config so a large env file does not overload the runner.
@@ -137,7 +134,6 @@ def _process_apps_in_parallel(
             try:
                 app_updates = future.result()
                 updates_info.update(app_updates)
-                rebuilt_apps.update(app_updates)
                 logger.info(f"Progress: {completed_count}/{total_apps} apps completed ({app_name})")
             except Exception as e:  # noqa: BLE001
                 logger.info(f"Progress: {completed_count}/{total_apps} apps completed ({app_name} - FAILED)")
@@ -166,7 +162,6 @@ def main() -> None:
     config = RevancedConfig(env)
     updates_info = {}
     failed_apps: list[str] = []
-    rebuilt_apps: set[str] = set()
     Downloader.extra_downloads(config)
     if not config.dry_run:
         check_java()
@@ -183,13 +178,13 @@ def main() -> None:
 
     try:
         if len(config.apps) == 1 or config.ci_test:
-            _process_apps_sequentially(config, caches, updates_info, failed_apps, rebuilt_apps)
+            _process_apps_sequentially(config, caches, updates_info, failed_apps)
         else:
-            _process_apps_in_parallel(config, caches, updates_info, failed_apps, rebuilt_apps)
+            _process_apps_in_parallel(config, caches, updates_info, failed_apps)
     finally:
         # Always write partial metadata for successful apps before surfacing the aggregate failure.
         write_changelog_to_file(updates_info)
-        generate_obtainium_export(updates_info, config, rebuilt_apps)
+        generate_obtainium_export(updates_info, config)
 
     _raise_if_no_apps_succeeded(failed_apps, updates_info)
 

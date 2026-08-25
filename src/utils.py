@@ -274,7 +274,12 @@ def datetime_to_ms_epoch(dt: datetime) -> int:
 
 
 def load_older_updates(env: Env) -> dict[str, Any]:
-    """Load older updated from updates.json."""
+    """Load older updates from updates.json, resetting each entry's patched-this-run status.
+
+    Every loaded entry is marked ``patched_this_run: False`` since none of them have been touched by
+    this process yet; ``save_patch_info`` flips it back to ``True`` only for apps this run actually
+    (re)patches, giving callers a single place to check "was this really built now" per app.
+    """
     try:
         update_file_url = updates_file_url.format(
             github_repository=env.str("GITHUB_REPOSITORY"),
@@ -282,10 +287,13 @@ def load_older_updates(env: Env) -> dict[str, Any]:
             updates_file=updates_file,
         )
         with urllib.request.urlopen(update_file_url) as url:
-            return json.load(url)  # type: ignore[no-any-return]
+            updates_info: dict[str, Any] = json.load(url)
     except Exception as e:  # noqa: BLE001
         logger.error(f"Failed to retrieve update file: {e}")
         return {}
+    for app_data in updates_info.values():
+        app_data["patched_this_run"] = False
+    return updates_info
 
 
 def save_patch_info(app: "APP", updates_info: dict[str, Any], config: "RevancedConfig") -> dict[str, Any]:
@@ -301,6 +309,9 @@ def save_patch_info(app: "APP", updates_info: dict[str, Any], config: "RevancedC
         # Persisted per-app so a later partial build (some apps not rebuilt) still links each app's
         # HTML page at the release tag its own asset actually lives under, instead of the current run's.
         "obtainium_github_tag": config.obtainium_github_tag,
+        # The single source of truth for "was this app actually (re)patched this run" - see
+        # load_older_updates, which resets this to False for every entry it loads from history.
+        "patched_this_run": True,
     }
     return updates_info
 
@@ -525,45 +536,53 @@ def _render_obtainium_html(
     return html_content.strip()
 
 
-def _fetch_existing_obtainium_html(github_repository: str, html_file_name: str) -> str | None:
-    """Fetch a previously published Obtainium page verbatim from the changelogs branch.
+def _sync_published_obtainium_sources(config: "RevancedConfig", obtainium_sources_path: Path) -> None:
+    """Populate obtainium_sources/ with whatever the changelogs branch currently publishes.
 
-    The build workflow never checks out the changelogs branch, so an app's page would otherwise be
-    regenerated from scratch (and re-committed) every run even when the app wasn't rebuilt. Reusing the
-    already-published bytes keeps that commit limited to apps that actually changed this run.
+    The build workflow checks out only the default branch, so this directory starts empty every run.
+    Pulling the real published files once via git (instead of guessing per app from in-memory metadata,
+    which can be stale or carry entries this build never produced) means an app not rebuilt this run
+    keeps its actual existing page untouched.
     """
-    source_url = obtainium_source_url.format(
-        github_repository=github_repository,
-        branch_name=branch_name,
-        file_name=html_file_name,
-    )
+    github_repository = config.env.str("GITHUB_REPOSITORY", "")
+    if not github_repository:
+        return
+    remote_url = f"https://github.com/{github_repository}.git"
     try:
-        with urllib.request.urlopen(source_url) as response:
-            return str(response.read().decode("utf_8"))
-    except Exception as e:  # noqa: BLE001
-        logger.warning(f"Failed to fetch existing Obtainium page {html_file_name}: {e}")
-        return None
+        subprocess.run(
+            ["git", "fetch", "--depth", "1", remote_url, branch_name],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=request_timeout,
+        )
+        subprocess.run(
+            ["git", "checkout", "FETCH_HEAD", "--", str(obtainium_sources_path)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        logger.info(f"Synced existing Obtainium pages from the {branch_name} branch.")
+    except (subprocess.SubprocessError, OSError) as e:
+        # No changelogs branch yet (first-ever run), or nothing published there to sync.
+        logger.warning(f"Could not sync existing Obtainium pages from {branch_name}: {e}")
 
 
-def generate_obtainium_export(
-    updates_info: dict[str, Any],
-    config: "RevancedConfig",
-    rebuilt_apps: set[str] | None = None,
-) -> None:
+def generate_obtainium_export(updates_info: dict[str, Any], config: "RevancedConfig") -> None:
     """Generate HTML files for Obtainium.
 
-    Parameters
-    ----------
-    rebuilt_apps : set[str] | None
-        Apps actually (re)patched this run. Only these get a freshly rendered page; every other app
-        keeps its already-published page verbatim (fetched from the changelogs branch) so the export
-        commit reflects only what changed. ``None`` regenerates everyone, matching the old behavior.
+    Scoped to ``config.all_apps`` - the full roster this project builds - not every app that happens
+    to have an entry in ``updates_info``, which can carry stale or foreign data. An app gets a freshly
+    rendered page only if ``updates_info[app]["patched_this_run"]`` is true (see ``save_patch_info``
+    and ``load_older_updates``); every other app keeps its already-published page untouched, and only
+    falls back to being (re)rendered here if it has no page yet at all.
     """
     if not config.obtainium_export:
         return
 
     obtainium_sources_path = Path("obtainium_sources")
     obtainium_sources_path.mkdir(exist_ok=True)
+    _sync_published_obtainium_sources(config, obtainium_sources_path)
 
     github_repository = config.env.str("GITHUB_REPOSITORY", "")
     repo_owner = github_repository.split("/")[0] if github_repository else ""
@@ -572,12 +591,11 @@ def generate_obtainium_export(
         logger.warning("GITHUB_REPOSITORY not set. Skipping Obtainium export.")
         return
 
-    apps_to_regenerate = rebuilt_apps if rebuilt_apps is not None else set(updates_info.keys())
-
     site_cards: list[dict[str, str]] = []
 
-    for app_name, app_data in updates_info.items():
-        if "output_file_name" not in app_data:
+    for app_name in config.all_apps:
+        app_data = updates_info.get(app_name)
+        if not app_data or "output_file_name" not in app_data:
             continue
 
         # The HTML source hashes the APK link by default, so this label is informational for users.
@@ -587,7 +605,7 @@ def generate_obtainium_export(
         html_file_name = f"{slugify(str(app_name)) or 'app'}.html"
         html_file_path = obtainium_sources_path / html_file_name
 
-        if app_name in apps_to_regenerate:
+        if app_data.get("patched_this_run") or not html_file_path.exists():
             html_content = _render_obtainium_html(
                 app_data=app_data,
                 config=config,
@@ -598,19 +616,7 @@ def generate_obtainium_export(
             html_file_path.write_text(html_content, encoding="utf_8")
             logger.info(f"Generated Obtainium export for {app_name}: {html_file_path}")
         else:
-            # Not rebuilt this run: reuse the already-published page so it isn't re-committed unchanged.
-            fetched_html = _fetch_existing_obtainium_html(github_repository, html_file_name)
-            if fetched_html is None:
-                logger.warning(f"No existing Obtainium page found for {app_name}; regenerating from current metadata.")
-                fetched_html = _render_obtainium_html(
-                    app_data=app_data,
-                    config=config,
-                    github_repository=github_repository,
-                    display_app_name=display_app_name,
-                    display_version=display_version,
-                )
-            html_file_path.write_text(fetched_html, encoding="utf_8")
-            logger.debug(f"Reused existing Obtainium export for {app_name}: {html_file_path}")
+            logger.debug(f"Keeping existing Obtainium export for {app_name}: {html_file_path}")
 
         if config.obtainium_site_export:
             package_name = str(app_data["app_dump"].get("package_name", ""))
