@@ -5,20 +5,21 @@ import os
 import dotenv
 from loguru import logger
 
-from src.utils import default_build
-
 
 def update_patch_apps() -> None:
-    """Update preferred apps."""
+    """Point this run's apps at PREFERRED_PATCH_APPS without touching the full PATCH_APPS roster.
+
+    PATCH_APPS_OVERRIDE narrows which apps get built this run; RevancedConfig falls back to the full
+    PATCH_APPS roster whenever it's unset. Overwriting PATCH_APPS itself would permanently lose the
+    full roster for anything (like the Obtainium export) that needs to know every app this project
+    builds, not just the subset selected for a given partial run.
+    """
     dotenv_file = dotenv.find_dotenv()
     dotenv.load_dotenv(dotenv_file)
-    patch_apps = os.environ.get("PATCH_APPS", default_build)
-    logger.info(f"PATCH_APPS is currently {patch_apps}")
-    os.environ["PATCH_APPS"] = os.environ["PREFERRED_PATCH_APPS"]
-    new_patch_apps = os.environ["PATCH_APPS"]
-    logger.info(f"PATCH_APPS is now {new_patch_apps}")
+    preferred_apps = os.environ["PREFERRED_PATCH_APPS"]
+    logger.info(f"Overriding this run's apps to {preferred_apps}")
 
-    dotenv.set_key(dotenv_file, "PATCH_APPS", os.environ["PATCH_APPS"])
+    dotenv.set_key(dotenv_file, "PATCH_APPS_OVERRIDE", preferred_apps)
 
 
 if __name__ == "__main__":
