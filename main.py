@@ -62,7 +62,7 @@ def process_single_app(
 
         parser.include_exclude_patch(app, app_all_patches, patcher.patches_dict)
         logger.info(app)
-        app_update_info = save_patch_info(app, {})
+        app_update_info = save_patch_info(app, {}, config)
         parser.patch_app(app)
     except AppNotFoundError as e:
         logger.info(e)

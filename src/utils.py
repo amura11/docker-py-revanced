@@ -62,7 +62,9 @@ apkmirror_scraper = cloudscraper.create_scraper()
 apkmirror_scraper.headers.update({"User-Agent": request_header["User-Agent"]})
 updates_file = "updates.json"
 updates_file_url = "https://raw.githubusercontent.com/{github_repository}/{branch_name}/{updates_file}"
-obtainium_source_url = "https://raw.githubusercontent.com/{github_repository}/{branch_name}/obtainium_sources/{file_name}"
+obtainium_source_url = (
+    "https://raw.githubusercontent.com/{github_repository}/{branch_name}/obtainium_sources/{file_name}"
+)
 changelogs: dict[str, dict[str, str]] = {}
 time_zone = "Asia/Kolkata"
 app_version_key = "app_version"
@@ -286,7 +288,7 @@ def load_older_updates(env: Env) -> dict[str, Any]:
         return {}
 
 
-def save_patch_info(app: "APP", updates_info: dict[str, Any]) -> dict[str, Any]:
+def save_patch_info(app: "APP", updates_info: dict[str, Any], config: "RevancedConfig") -> dict[str, Any]:
     """Save version info a patching resources used to a file."""
     updates_info[app.app_name] = {
         app_version_key: app.app_version,
@@ -296,6 +298,9 @@ def save_patch_info(app: "APP", updates_info: dict[str, Any]) -> dict[str, Any]:
         "date_patched": datetime.now(ZoneInfo(time_zone)),
         "app_dump": app.for_dump(),
         "output_file_name": app.get_output_file_name(),
+        # Persisted per-app so a later partial build (some apps not rebuilt) still links each app's
+        # HTML page at the release tag its own asset actually lives under, instead of the current run's.
+        "obtainium_github_tag": config.obtainium_github_tag,
     }
     return updates_info
 
@@ -341,8 +346,7 @@ def _write_obtainium_index(cards: list[dict[str, str]]) -> None:
     Written to the repo root (not obtainium_sources/) because GitHub Pages' branch-deploy mode can only
     serve from a branch's root or its /docs folder - never an arbitrary subfolder.
     """
-    rows = "\n".join(
-        f"""        <li class="app-card">
+    rows = "\n".join(f"""        <li class="app-card">
             <div class="app-header">
                 <span class="app-name">{card["name"]}</span>
                 <code class="package-name">{card["package_name"]}</code>
@@ -355,9 +359,7 @@ def _write_obtainium_index(cards: list[dict[str, str]]) -> None:
                 <a class="add-button" href="{card["deep_link"]}">Add to Obtainium</a>
                 <a class="source-link" href="{card["source_url"]}">View source</a>
             </div>
-        </li>"""
-        for card in cards
-    )
+        </li>""" for card in cards)
     html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -484,7 +486,6 @@ def generate_obtainium_export(updates_info: dict[str, Any], config: "RevancedCon
     obtainium_sources_path.mkdir(exist_ok=True)
 
     github_repository = config.env.str("GITHUB_REPOSITORY", "")
-    obtainium_github_tag = config.obtainium_github_tag
     repo_owner = github_repository.split("/")[0] if github_repository else ""
 
     if not github_repository:
@@ -500,6 +501,10 @@ def generate_obtainium_export(updates_info: dict[str, Any], config: "RevancedCon
         # Release asset names are URL path segments, so encode them without allowing slash traversal.
         output_file_name = str(app_data["output_file_name"])
         encoded_output_file_name = quote(output_file_name, safe="")
+        # Each app links to the release tag its own asset was actually uploaded under. Apps not rebuilt
+        # this run fall back to their own last-recorded tag (not this run's), since their asset lives
+        # there, not in the current release; entries predating this field fall back to the live config.
+        obtainium_github_tag = str(app_data.get("obtainium_github_tag") or config.obtainium_github_tag)
         # Tags are also path segments, and custom tags may contain characters that need encoding.
         encoded_obtainium_github_tag = quote(obtainium_github_tag, safe="")
 
@@ -545,7 +550,9 @@ def generate_obtainium_export(updates_info: dict[str, Any], config: "RevancedCon
                 logger.warning(f"No package_name for {app_name}. Skipping its Obtainium deep link.")
             else:
                 source_url = obtainium_source_url.format(
-                    github_repository=github_repository, branch_name=branch_name, file_name=html_file_name,
+                    github_repository=github_repository,
+                    branch_name=branch_name,
+                    file_name=html_file_name,
                 )
                 deep_link = _obtainium_deep_link(
                     package_name=package_name,
