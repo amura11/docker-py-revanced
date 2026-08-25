@@ -477,54 +477,37 @@ def _write_obtainium_index(cards: list[dict[str, str]]) -> None:
     logger.info(f"Generated Obtainium site index: {index_path}")
 
 
-def generate_obtainium_export(updates_info: dict[str, Any], config: "RevancedConfig") -> None:
-    """Generate HTML files for Obtainium."""
-    if not config.obtainium_export:
-        return
+def _render_obtainium_html(
+    *,
+    app_data: dict[str, Any],
+    config: "RevancedConfig",
+    github_repository: str,
+    display_app_name: str,
+    display_version: str,
+) -> str:
+    """Render one app's Obtainium HTML source page from its current metadata."""
+    # Release asset names are URL path segments, so encode them without allowing slash traversal.
+    output_file_name = str(app_data["output_file_name"])
+    encoded_output_file_name = quote(output_file_name, safe="")
+    # Each app links to the release tag its own asset was actually uploaded under. Apps not rebuilt
+    # this run fall back to their own last-recorded tag (not this run's), since their asset lives
+    # there, not in the current release; entries predating this field fall back to the live config.
+    obtainium_github_tag = str(app_data.get("obtainium_github_tag") or config.obtainium_github_tag)
+    # Tags are also path segments, and custom tags may contain characters that need encoding.
+    encoded_obtainium_github_tag = quote(obtainium_github_tag, safe="")
 
-    obtainium_sources_path = Path("obtainium_sources")
-    obtainium_sources_path.mkdir(exist_ok=True)
+    # Construct the same public release URL shape GitHub serves for release assets.
+    if obtainium_github_tag == "latest":
+        # Latest release URLs let the generated HTML survive timestamp-based release tags.
+        download_url = f"https://github.com/{github_repository}/releases/latest/download/{encoded_output_file_name}"
+    else:
+        # Fixed tag URLs are available for users who keep a stable release tag outside the default workflow.
+        download_url = (
+            f"https://github.com/{github_repository}/releases/download/"
+            f"{encoded_obtainium_github_tag}/{encoded_output_file_name}"
+        )
 
-    github_repository = config.env.str("GITHUB_REPOSITORY", "")
-    repo_owner = github_repository.split("/")[0] if github_repository else ""
-
-    if not github_repository:
-        logger.warning("GITHUB_REPOSITORY not set. Skipping Obtainium export.")
-        return
-
-    site_cards: list[dict[str, str]] = []
-
-    for app_name, app_data in updates_info.items():
-        if "output_file_name" not in app_data:
-            continue
-
-        # Release asset names are URL path segments, so encode them without allowing slash traversal.
-        output_file_name = str(app_data["output_file_name"])
-        encoded_output_file_name = quote(output_file_name, safe="")
-        # Each app links to the release tag its own asset was actually uploaded under. Apps not rebuilt
-        # this run fall back to their own last-recorded tag (not this run's), since their asset lives
-        # there, not in the current release; entries predating this field fall back to the live config.
-        obtainium_github_tag = str(app_data.get("obtainium_github_tag") or config.obtainium_github_tag)
-        # Tags are also path segments, and custom tags may contain characters that need encoding.
-        encoded_obtainium_github_tag = quote(obtainium_github_tag, safe="")
-
-        # Construct the same public release URL shape GitHub serves for release assets.
-        if obtainium_github_tag == "latest":
-            # Latest release URLs let the generated HTML survive timestamp-based release tags.
-            download_url = f"https://github.com/{github_repository}/releases/latest/download/{encoded_output_file_name}"
-        else:
-            # Fixed tag URLs are available for users who keep a stable release tag outside the default workflow.
-            download_url = (
-                f"https://github.com/{github_repository}/releases/download/"
-                f"{encoded_obtainium_github_tag}/{encoded_output_file_name}"
-            )
-
-        # The HTML source hashes the APK link by default, so this label is informational for users.
-        display_version = html.escape(str(app_data.get(app_version_key, "unknown")))
-        # App names may come from env configuration, so escape text and slug filenames before writing HTML.
-        display_app_name = html.escape(str(app_name))
-        html_file_name = f"{slugify(str(app_name)) or 'app'}.html"
-        html_content = f"""
+    html_content = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -539,10 +522,95 @@ def generate_obtainium_export(updates_info: dict[str, Any], config: "RevancedCon
 </body>
 </html>
 """
-        # Each app gets one HTML source page so users can subscribe to only the apps they patch.
+    return html_content.strip()
+
+
+def _fetch_existing_obtainium_html(github_repository: str, html_file_name: str) -> str | None:
+    """Fetch a previously published Obtainium page verbatim from the changelogs branch.
+
+    The build workflow never checks out the changelogs branch, so an app's page would otherwise be
+    regenerated from scratch (and re-committed) every run even when the app wasn't rebuilt. Reusing the
+    already-published bytes keeps that commit limited to apps that actually changed this run.
+    """
+    source_url = obtainium_source_url.format(
+        github_repository=github_repository,
+        branch_name=branch_name,
+        file_name=html_file_name,
+    )
+    try:
+        with urllib.request.urlopen(source_url) as response:
+            return str(response.read().decode("utf_8"))
+    except Exception as e:  # noqa: BLE001
+        logger.warning(f"Failed to fetch existing Obtainium page {html_file_name}: {e}")
+        return None
+
+
+def generate_obtainium_export(
+    updates_info: dict[str, Any],
+    config: "RevancedConfig",
+    rebuilt_apps: set[str] | None = None,
+) -> None:
+    """Generate HTML files for Obtainium.
+
+    Parameters
+    ----------
+    rebuilt_apps : set[str] | None
+        Apps actually (re)patched this run. Only these get a freshly rendered page; every other app
+        keeps its already-published page verbatim (fetched from the changelogs branch) so the export
+        commit reflects only what changed. ``None`` regenerates everyone, matching the old behavior.
+    """
+    if not config.obtainium_export:
+        return
+
+    obtainium_sources_path = Path("obtainium_sources")
+    obtainium_sources_path.mkdir(exist_ok=True)
+
+    github_repository = config.env.str("GITHUB_REPOSITORY", "")
+    repo_owner = github_repository.split("/")[0] if github_repository else ""
+
+    if not github_repository:
+        logger.warning("GITHUB_REPOSITORY not set. Skipping Obtainium export.")
+        return
+
+    apps_to_regenerate = rebuilt_apps if rebuilt_apps is not None else set(updates_info.keys())
+
+    site_cards: list[dict[str, str]] = []
+
+    for app_name, app_data in updates_info.items():
+        if "output_file_name" not in app_data:
+            continue
+
+        # The HTML source hashes the APK link by default, so this label is informational for users.
+        display_version = html.escape(str(app_data.get(app_version_key, "unknown")))
+        # App names may come from env configuration, so escape text and slug filenames before writing HTML.
+        display_app_name = html.escape(str(app_name))
+        html_file_name = f"{slugify(str(app_name)) or 'app'}.html"
         html_file_path = obtainium_sources_path / html_file_name
-        html_file_path.write_text(html_content.strip(), encoding="utf_8")
-        logger.info(f"Generated Obtainium export for {app_name}: {html_file_path}")
+
+        if app_name in apps_to_regenerate:
+            html_content = _render_obtainium_html(
+                app_data=app_data,
+                config=config,
+                github_repository=github_repository,
+                display_app_name=display_app_name,
+                display_version=display_version,
+            )
+            html_file_path.write_text(html_content, encoding="utf_8")
+            logger.info(f"Generated Obtainium export for {app_name}: {html_file_path}")
+        else:
+            # Not rebuilt this run: reuse the already-published page so it isn't re-committed unchanged.
+            fetched_html = _fetch_existing_obtainium_html(github_repository, html_file_name)
+            if fetched_html is None:
+                logger.warning(f"No existing Obtainium page found for {app_name}; regenerating from current metadata.")
+                fetched_html = _render_obtainium_html(
+                    app_data=app_data,
+                    config=config,
+                    github_repository=github_repository,
+                    display_app_name=display_app_name,
+                    display_version=display_version,
+                )
+            html_file_path.write_text(fetched_html, encoding="utf_8")
+            logger.debug(f"Reused existing Obtainium export for {app_name}: {html_file_path}")
 
         if config.obtainium_site_export:
             package_name = str(app_data["app_dump"].get("package_name", ""))

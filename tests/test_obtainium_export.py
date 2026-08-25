@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from typing import Self, cast
 from unittest import TestCase
+from unittest.mock import MagicMock, patch
 from urllib.parse import unquote
 
 from environs import Env
@@ -228,6 +229,66 @@ class ObtainiumExportTests(TestCase):
         self.assertIn("/releases/download/Build-1/AppA-output.apk", app_a_html)
         self.assertIn("/releases/download/Build-2/AppB-output.apk", app_b_html)
         self.assertIn("/releases/download/Build-2/AppC-output.apk", app_c_html)
+
+    def test_generate_obtainium_export_reuses_existing_page_for_apps_not_rebuilt(self: Self) -> None:
+        """An app outside rebuilt_apps should keep its already-published page instead of being regenerated.
+
+        The build workflow never checks out the changelogs branch, so every regenerated file looks new
+        to that commit. Reusing unrebuilt apps' already-published bytes keeps the commit limited to apps
+        that actually changed this run.
+        """
+        with TemporaryDirectory() as temp_dir, chdir(temp_dir):
+            config = cast(
+                "RevancedConfig",
+                SimpleNamespace(
+                    obtainium_export=True,
+                    obtainium_github_tag="Build-2",
+                    obtainium_site_export=False,
+                    env=_Env("owner/repo"),
+                ),
+            )
+            updates_info = {
+                "AppA": {"output_file_name": "AppA-output.apk", "obtainium_github_tag": "Build-1"},
+                "AppB": {"output_file_name": "AppB-output.apk", "obtainium_github_tag": "Build-2"},
+            }
+
+            mock_response = MagicMock()
+            mock_response.__enter__.return_value = mock_response
+            mock_response.read.return_value = b"<html>previously published AppA page</html>"
+
+            with patch("src.utils.urllib.request.urlopen", return_value=mock_response) as mock_urlopen:
+                generate_obtainium_export(updates_info, config, rebuilt_apps={"AppB"})
+
+            app_a_html = Path(temp_dir, "obtainium_sources", "appa.html").read_text(encoding="utf_8")
+            app_b_html = Path(temp_dir, "obtainium_sources", "appb.html").read_text(encoding="utf_8")
+
+        self.assertEqual(app_a_html, "<html>previously published AppA page</html>")
+        self.assertIn("/releases/download/Build-2/AppB-output.apk", app_b_html)
+        mock_urlopen.assert_called_once()
+        self.assertIn("appa.html", mock_urlopen.call_args[0][0])
+
+    def test_generate_obtainium_export_regenerates_when_existing_page_fetch_fails(self: Self) -> None:
+        """A fetch failure for an unrebuilt app should fall back to regenerating rather than dropping it."""
+        with TemporaryDirectory() as temp_dir, chdir(temp_dir):
+            config = cast(
+                "RevancedConfig",
+                SimpleNamespace(
+                    obtainium_export=True,
+                    obtainium_github_tag="Build-2",
+                    obtainium_site_export=False,
+                    env=_Env("owner/repo"),
+                ),
+            )
+            updates_info = {
+                "AppA": {"output_file_name": "AppA-output.apk", "obtainium_github_tag": "Build-1"},
+            }
+
+            with patch("src.utils.urllib.request.urlopen", side_effect=OSError("network down")):
+                generate_obtainium_export(updates_info, config, rebuilt_apps=set())
+
+            app_a_html = Path(temp_dir, "obtainium_sources", "appa.html").read_text(encoding="utf_8")
+
+        self.assertIn("/releases/download/Build-1/AppA-output.apk", app_a_html)
 
     def test_default_version_extraction_regex_handles_optional_patch_prefix(self: Self) -> None:
         """The shipped default regex must match patch bundle versions with or without a leading 'v'."""
