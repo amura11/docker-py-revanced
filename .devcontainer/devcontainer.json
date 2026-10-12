@@ -1,0 +1,29 @@
+{
+  "name": "docker-py-revanced (dev)",
+  // 3.13, not this project's runtime 3.14 (Dockerfile-base), because pyproject.toml pins
+  // ruff/mypy's target-version to py313 - matching that keeps lint/type-check results accurate.
+  "image": "mcr.microsoft.com/devcontainers/python:3.13-bookworm",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {}
+  },
+
+  // Forwarded from the host at container-attach time (not baked into the image), so it's picked up
+  // from whatever host env already has it set - e.g. via `claude setup-token`.
+  "remoteEnv": {
+    "CLAUDE_CODE_OAUTH_TOKEN": "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}"
+  },
+
+  "postCreateCommand": "pip install --no-cache-dir -r requirements.txt && npm install -g @anthropic-ai/claude-code && pre-commit install",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "ms-python.mypy-type-checker",
+        "Anthropic.claude-code",
+        "streetsidesoftware.code-spell-checker"
+      ]
+    }
+  }
+}
