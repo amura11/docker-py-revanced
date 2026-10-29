@@ -15,7 +15,7 @@ on:
         description: "Delete older Build-* releases before uploading. This workflow does partial builds (only apps with updates), so disable to avoid dropping releases for apps not included in a given run."
         required: false
         type: boolean
-        default: true
+        default: false
   schedule:
     - cron: '0 0 * * MON'
 jobs:
