@@ -3,6 +3,7 @@
 import zipfile
 from pathlib import Path
 from subprocess import PIPE, Popen
+from tempfile import TemporaryDirectory
 from time import perf_counter
 from typing import Any, Self
 
@@ -25,7 +26,7 @@ class Apkeep(Downloader):
 
         The suffix is passed straight through to apkeep's own -d flag instead of being validated
         against a list this project would have to keep in sync, so any provider apkeep supports
-        (google-play, apk-pure, f-droid, huawei-app-gallery, ...) works without a code change here.
+        (google-play, apk-pure, f-droid, ...) works without a code change here.
         """
         _, _, provider = download_source.partition(":")
         return provider or DEFAULT_APKEEP_PROVIDER
@@ -39,7 +40,7 @@ class Apkeep(Downloader):
         """
         return f"{package_name}@{version}" if version and version != "latest" else package_name
 
-    def _build_apkeep_command(self: Self, app: APP, version: str) -> tuple[list[str], list[str]]:
+    def _build_apkeep_command(self: Self, app: APP, version: str, output_dir: Path) -> tuple[list[str], list[str]]:
         """Build the apkeep invocation and a credential-redacted copy safe to log.
 
         Only Google Play needs account credentials; other providers (F-Droid, APKPure, ...) don't, so
@@ -60,84 +61,120 @@ class Apkeep(Downloader):
             cmd += ["-e", email]
         if token:
             cmd += ["-t", token]
-        cmd += ["-o", "split_apk=true", self.config.temp_folder_name]
+        cmd += ["-o", "split_apk=true", str(output_dir)]
 
         safe_cmd = list(cmd)
+        # Redact flag values by position, even when a credential equals another argument.
         if email:
-            safe_cmd[safe_cmd.index(email)] = "<redacted-email>"
+            safe_cmd[safe_cmd.index("-e") + 1] = "<redacted-email>"
         if token:
-            safe_cmd[safe_cmd.index(token)] = "<redacted-token>"
+            safe_cmd[8 if email else 6] = "<redacted-token>"
         return cmd, safe_cmd
 
     def _zip_apkeep_output(self: Self, folder_path: Path, zip_path: Path) -> str:
         """Zip apkeep's split-APK output directory into a single archive for the APKEditor merge step."""
         with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zipf:
             for file in folder_path.rglob("*"):
-                arcname = file.relative_to(self.config.temp_folder)
+                arcname = file.relative_to(folder_path.parent)
                 zipf.write(file, arcname)
         logger.debug(f"Zipped {folder_path} to {zip_path}")
         return zip_path.name
 
-    def _find_apkeep_output(self: Self, package_name: str) -> Path | None:
-        """Locate whatever apkeep just produced for this package.
+    def _find_apkeep_output(self: Self, package_name: str, version: str, output_dir: Path) -> Path | None:
+        """Locate whatever apkeep just produced for this package and version.
 
         apkeep names output after the exact -a identifier (package_name, or package_name@version when
         pinning a version), but that convention isn't verified across every provider, so this falls
         back to matching anything apkeep created for this package rather than failing on a name that's
         merely slightly off. Restricted to plausible identifier boundaries (., @, _) so it can't match
-        an unrelated package that happens to share this one as a prefix.
+        an unrelated package that happens to share this one as a prefix, and to candidates whose tail is
+        exactly a separator plus the requested version (so 1.0 never matches 1.0.1 or 11.0), or has no '@'
+        at all when no version was requested, so a leftover download for a different version is never
+        mistaken for this one.
         """
-        for candidate in sorted(self.config.temp_folder.glob(f"{package_name}*")):
+        for candidate in sorted(output_dir.glob(f"{package_name}*")):
             if candidate.name != package_name and candidate.name[len(package_name)] not in ".@_":
+                continue
+            tail = candidate.name[len(package_name) :]
+            if candidate.is_file() and candidate.suffix in {".apk", ".xapk", ".zip"}:
+                tail = tail[: -len(candidate.suffix)]
+            if version:
+                if not any(tail == f"{sep}{version}" for sep in "@_."):
+                    continue
+            elif "@" in tail:
                 continue
             if candidate.is_dir() or candidate.suffix in {".apk", ".xapk", ".zip"}:
                 return candidate
         return None
 
+    def _cached_name(self: Self, provider: str, identifier: str, suffix: str) -> str:
+        """Build this downloader's own provider-qualified cache filename for an apkeep identifier.
+
+        apkeep's native output naming has no concept of provider, so two providers asked for the same
+        package/version would otherwise collide on the same native filename. Fetched output is claimed
+        under this provider-qualified name instead, so a prior download from a different provider is
+        never mistaken for this one.
+        """
+        return f"{provider}__{identifier}{suffix}"
+
+    def _claim_apkeep_output(self: Self, native_path: Path, provider: str, identifier: str) -> str:
+        """Move apkeep's freshly produced output into this downloader's provider-qualified cache slot."""
+        cached_path = self.config.temp_folder / self._cached_name(provider, identifier, native_path.suffix)
+        native_path.replace(cached_path)
+        return cached_path.name
+
     def _run_apkeep(self: Self, app: APP, version: str = "") -> str:
         """Run apkeep CLI to fetch an APK from whichever provider the app's source selects."""
         package_name = app.package_name
+        provider = self._provider_from_source(app.download_source)
         identifier = self._apkeep_identifier(package_name, version)
-        file_path = self.config.temp_folder / f"{identifier}.apk"
-        folder_path = self.config.temp_folder / identifier
-        zip_path = self.config.temp_folder / f"{identifier}.zip"
 
-        # If already downloaded, return it
-        if file_path.exists():
-            logger.debug(f"{file_path.name} already downloaded.")
-            return file_path.name
-        if zip_path.exists():
-            logger.debug(f"{zip_path.name} already zipped and exists.")
-            return zip_path.name
+        cached_apk = self.config.temp_folder / self._cached_name(provider, identifier, ".apk")
+        cached_zip = self.config.temp_folder / self._cached_name(provider, identifier, ".zip")
 
-        cmd, safe_cmd = self._build_apkeep_command(app, version)
-        # Keep the exact execution command separate from the log-safe command so credentials never reach CI logs.
-        logger.debug(f"Running command: {safe_cmd}")
+        # If already downloaded from this provider, return it
+        if not self.config.disable_caching and cached_apk.exists():
+            logger.debug(f"{cached_apk.name} already downloaded.")
+            return cached_apk.name
+        if not self.config.disable_caching and cached_zip.exists():
+            logger.debug(f"{cached_zip.name} already zipped and exists.")
+            return cached_zip.name
 
-        start = perf_counter()
-        process = Popen(cmd, stdout=PIPE)
-        output = process.stdout
-        if not output:
-            msg = "Failed to send request for patching."
+        # Apkeep can exit successfully after skipping a download; isolate output to reject leftovers.
+        with TemporaryDirectory(dir=self.config.temp_folder) as temporary_output:
+            output_dir = Path(temporary_output)
+            cmd, safe_cmd = self._build_apkeep_command(app, version, output_dir)
+            # Keep the exact execution command separate from the log-safe command so credentials never reach CI logs.
+            logger.debug(f"Running command: {safe_cmd}")
+
+            start = perf_counter()
+            process = Popen(cmd, stdout=PIPE)
+            output = process.stdout
+            if not output:
+                msg = "Failed to send request for patching."
+                raise DownloadError(msg)
+            for line in output:
+                logger.debug(line.decode(), flush=True, end="")
+            process.wait()
+            if process.returncode != 0:
+                msg = f"Command failed with exit code {process.returncode} for app {package_name}"
+                raise DownloadError(msg)
+            logger.info(f"Downloading completed for app {package_name} in {perf_counter() - start:.2f} seconds.")
+
+            file_path = output_dir / f"{identifier}.apk"
+            folder_path = output_dir / identifier
+            if file_path.exists():
+                return self._claim_apkeep_output(file_path, provider, identifier)
+            if folder_path.exists() and folder_path.is_dir():
+                zip_name = self._zip_apkeep_output(folder_path, output_dir / f"{identifier}.zip")
+                return self._claim_apkeep_output(output_dir / zip_name, provider, identifier)
+            if found := self._find_apkeep_output(package_name, version, output_dir):
+                if found.is_dir():
+                    zip_name = self._zip_apkeep_output(found, output_dir / f"{identifier}.zip")
+                    return self._claim_apkeep_output(output_dir / zip_name, provider, identifier)
+                return self._claim_apkeep_output(found, provider, identifier)
+            msg = "APK file or folder not found after apkeep execution."
             raise DownloadError(msg)
-        for line in output:
-            logger.debug(line.decode(), flush=True, end="")
-        process.wait()
-        if process.returncode != 0:
-            msg = f"Command failed with exit code {process.returncode} for app {package_name}"
-            raise DownloadError(msg)
-        logger.info(f"Downloading completed for app {package_name} in {perf_counter() - start:.2f} seconds.")
-
-        if file_path.exists():
-            return file_path.name
-        if folder_path.exists() and folder_path.is_dir():
-            return self._zip_apkeep_output(folder_path, zip_path)
-        if found := self._find_apkeep_output(package_name):
-            if found.is_dir():
-                return self._zip_apkeep_output(found, zip_path)
-            return found.name
-        msg = "APK file or folder not found after apkeep execution."
-        raise DownloadError(msg)
 
     def latest_version(self: Self, app: APP, **kwargs: Any) -> tuple[str, str]:
         """Download the latest version from the app's apkeep provider."""
@@ -151,6 +188,10 @@ class Apkeep(Downloader):
 
         Google Play doesn't support this in apkeep; pick a provider that does, e.g. F-Droid or APKPure.
         """
+        # Apkeep skips pinned Google Play requests while still potentially exiting successfully.
+        if self._provider_from_source(app.download_source) == DEFAULT_APKEEP_PROVIDER:
+            msg = "Google Play does not support specific versions through apkeep."
+            raise DownloadError(msg)
         file_name = self._run_apkeep(app, version)
         logger.info(f"Got file name as {file_name}")
         provider = self._provider_from_source(app.download_source)
