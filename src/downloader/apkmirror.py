@@ -31,6 +31,7 @@ CLOAK_BROWSER_ARGS = [
 CLOAK_NETWORK_IDLE_TIMEOUT_MS = 15_000
 # Playwright expects milliseconds while the rest of the downloader config stores request timeouts in seconds.
 CLOAK_REQUEST_TIMEOUT_MS = request_timeout * 1000
+HTTP_NOT_FOUND = 404
 # APKMirror sometimes returns challenge HTML with HTTP 200, so the body needs explicit marker detection.
 CLOAK_CHALLENGE_MARKERS = (
     "attention required",
@@ -88,7 +89,12 @@ class ApkMirror(Downloader):
         """Fetch APKMirror HTML through CloakBrowser when cloudscraper receives a challenge page."""
         launch_browser, playwright_timeout_error, playwright_error = ApkMirror._cloak_dependencies(url, cause)
         # Launch CloakBrowser with container flags, human behavioral simulation, and optional license key.
-        browser = launch_browser(**ApkMirror._cloak_launch_kwargs())
+        try:
+            browser = launch_browser(**ApkMirror._cloak_launch_kwargs())
+        except Exception as exc:  # noqa: BLE001
+            # Missing system libraries or a bad install should surface as a downloader error, not a raw Playwright one.
+            msg = f"CloakBrowser could not start while loading {url}: {exc}"
+            raise APKMirrorAPKDownloadError(msg, url=url) from (cause or exc)
         try:
             page = browser.new_page()
             # CloakBrowser owns the browser fingerprint, so partial header overrides would desync client hints.
@@ -344,6 +350,8 @@ class ApkMirror(Downloader):
     # Twitter was rebranded to X, so modern releases use 'x-' while legacy builds used 'twitter-'.
     _SLUG_PREFIX_CANDIDATES: ClassVar[dict[str, tuple[str, ...]]] = {
         "twitter": ("x", "twitter"),
+        # TikTok's listing slug is long, but its release slugs are just 'tiktok-<version>-release'.
+        "tik-tok-including-musical-ly": ("tiktok", "tik-tok-including-musical-ly"),
     }
 
     @classmethod
@@ -351,6 +359,13 @@ class ApkMirror(Downloader):
         """Return candidate slug prefixes for release URLs, taking APKMirror rebrand and naming aliases into account."""
         # Prefer registered alias prefixes (e.g. 'x' for Twitter) while retaining the raw slug as fallback.
         return cls._SLUG_PREFIX_CANDIDATES.get(app_slug, (app_slug,))
+
+    @staticmethod
+    def _version_slug(version: str) -> str:
+        """Convert a version string into the dash-separated form used inside APKMirror release slugs."""
+        # Piko advertises `release-ripped` versions while APKMirror stores the matching upstream `release` APK.
+        # APKMirror normalizes version separators to dashes inside release slugs.
+        return version.replace("-ripped", "").replace(".", "-")
 
     @classmethod
     def _guess_release_urls(cls: type[Self], download_source: str, version: str) -> list[str]:
@@ -361,10 +376,7 @@ class ApkMirror(Downloader):
         """
         trimmed = download_source.rstrip("/")
         app_slug = trimmed.rsplit("/", maxsplit=1)[-1]
-        # Piko advertises `release-ripped` versions while APKMirror stores the matching upstream `release` APK.
-        clean_version = version.replace("-ripped", "")
-        # APKMirror normalizes version separators to dashes inside release slugs.
-        version_slug = clean_version.replace(".", "-")
+        version_slug = cls._version_slug(version)
         # Try each candidate prefix in order (e.g. 'x' before 'twitter' for X Corp releases).
         return [f"{trimmed}/{prefix}-{version_slug}-release/" for prefix in cls._candidate_slug_prefixes(app_slug)]
 
@@ -377,7 +389,16 @@ class ApkMirror(Downloader):
     def _try_resolve_guessed_release_url(self: Self, app: APP, version: str) -> str | None:
         """Probe candidate direct release URLs, returning the first one with a valid variants table."""
         # Fast path: test each constructed release URL directly to avoid expensive listing scraping.
-        for guessed_url in self._guess_release_urls(app.download_source, version):
+        urls = self._guess_release_urls(app.download_source, version)
+        if override := getattr(app, "apkmirror_slug_prefix", ""):
+            # A user-supplied prefix wins over guesses and needs no listing page, which Cloudflare often challenges.
+            base_url = app.download_source.rstrip("/")
+            urls.insert(0, f"{base_url}/{override}-{self._version_slug(version)}-release/")
+        return self._probe_release_urls(app, version, urls)
+
+    def _probe_release_urls(self: Self, app: APP, version: str, urls: list[str]) -> str | None:
+        """Return the first URL whose page contains a release variants table."""
+        for guessed_url in urls:
             try:
                 page_source = self._extract_source(guessed_url)
                 # A valid release page contains the variants table; a 404 or soft-error page does not.
@@ -443,6 +464,10 @@ class ApkMirror(Downloader):
         pages that cloudscraper can no longer solve.
         """
         response = apkmirror_scraper.get(url, timeout=request_timeout)
+        if response.status_code == HTTP_NOT_FOUND:
+            # A real 404 is not a Cloudflare challenge, so a browser retry cannot help and guessed URLs hit this often.
+            msg = f"APKMirror page not found: {url}"
+            raise ScrapingError(msg, url=url)
         try:
             # Non-200 challenge responses need the same browser fallback as HTTP 200 challenge pages.
             handle_request_response(response, url)

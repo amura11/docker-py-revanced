@@ -52,6 +52,8 @@ class APP(object):
         self.download_file_name = ""
         self.download_dl = config.env.str(f"{app_name}_DL".upper(), "")
         self.download_source = config.env.str(f"{app_name}_DL_SOURCE".upper(), "")
+        # Optional APKMirror release slug prefix (e.g. 'tiktok') for apps whose release slug differs from the listing.
+        self.apkmirror_slug_prefix = config.env.str(f"{app_name}_APKMIRROR_SLUG".upper(), "")
         self.package_name = package_name
         self.old_key = config.env.bool(f"{app_name}_OLD_KEY".upper(), config.global_old_key)
         self.patches: list[dict[Any, Any]] = []

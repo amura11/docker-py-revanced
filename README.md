@@ -157,6 +157,7 @@ You can use any of the following methods to build.
 | [**APP_NAME**_VERSION](#app-version)                          |                              Version to use for download for patching.                               | Recommended by patch resources |
 | [**APP_NAME**_PACKAGE_NAME***](#any-patch-apps)               |                                Package name of the app to be patched                                 | None                           |
 | [**APP_NAME**_DL_SOURCE***](#any-patch-apps)                  |                           Download source of any of the supported scrapper                           | None                           |
+| **APP_NAME**_APKMIRROR_SLUG                                   | APKMirror release slug prefix when it differs from the listing slug (e.g. `tiktok`)                  | None                           |
 | [**APP_NAME**_DL***](#app-dl)                                 |                                  Direct download Link for clean apk                                  | None                           |
 
 `**` - By default all patches for a given app are included.<br>
