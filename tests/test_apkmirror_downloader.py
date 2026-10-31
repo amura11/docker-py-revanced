@@ -274,6 +274,45 @@ class APKMirrorDownloaderTests(TestCase):
             "https://www.apkmirror.com/apk/x-corp/twitter/x-12-19-1-release-0-release/",
         )
 
+    def test_find_specific_version_prefers_configured_slug_prefix(self: Self) -> None:
+        """A configured slug prefix is probed first and avoids fetching the listing page."""
+        app = cast(
+            "APP",
+            SimpleNamespace(
+                app_name="TIKTOK",
+                app_version="47.5.3",
+                download_source="https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/",
+                apkmirror_slug_prefix="tiktok",
+                effective_cli_argsf="morphe-cli",
+            ),
+        )
+
+        with TemporaryDirectory() as tmp_dir:
+            downloader = ApkMirror(_config(Path(tmp_dir)))
+            with patch.object(
+                downloader,
+                "_extract_source",
+                return_value='<div class="tab-pane noPadding">variants table here</div>',
+            ) as extract:
+                result = downloader._find_specific_version_page(app, "47.5.3")
+
+        self.assertEqual(
+            "https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/tiktok-47-5-3-release/",
+            result,
+        )
+        extract.assert_called_once()
+
+    def test_guess_release_urls_handles_tiktok_short_slug(self: Self) -> None:
+        """TikTok release slugs use 'tiktok' rather than the long listing slug."""
+        urls = ApkMirror._guess_release_urls(
+            "https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/",
+            "47.5.3",
+        )
+        self.assertEqual(
+            "https://www.apkmirror.com/apk/tiktok-pte-ltd/tik-tok-including-musical-ly/tiktok-47-5-3-release/",
+            urls[0],
+        )
+
     def test_guess_release_urls_handles_twitter_rebrand(self: Self) -> None:
         """The candidate release URLs for Twitter should place the modern 'x' prefix first."""
         urls = ApkMirror._guess_release_urls(
