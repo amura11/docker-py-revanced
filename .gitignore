@@ -7,10 +7,11 @@
 changelog.md
 .idea
 *.json
-!.devcontainer/devcontainer.json
-!.devcontainer/devcontainer-lock.json
 status.md
 *.zip
 apks/*
 *.rvp
 *.backup
+
+# Fork-local dev environment lives on the "devcontainer" branch.
+.devcontainer/
