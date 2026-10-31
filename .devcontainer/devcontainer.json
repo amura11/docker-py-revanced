@@ -4,16 +4,30 @@
   // ruff/mypy's target-version to py313 - matching that keeps lint/type-check results accurate.
   "image": "mcr.microsoft.com/devcontainers/python:3.13-bookworm",
   "features": {
-    "ghcr.io/devcontainers/features/node:1": {}
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/java:1": {
+        "version": "21",
+        "jdkDistro": "zulu"
+    }
   },
 
-  // Forwarded from the host at container-attach time (not baked into the image), so it's picked up
-  // from whatever host env already has it set - e.g. via `claude setup-token`.
+  // Tokens come from the host environment so nothing is mounted across OSes.
+  //   GH_TOKEN:                  `gh auth token`
+  //   CLAUDE_CODE_OAUTH_TOKEN:   `claude setup-token`
+  // Set them in your shell profile / system env BEFORE launching VS Code.
   "remoteEnv": {
+    "GH_TOKEN": "${localEnv:GH_TOKEN}",
     "CLAUDE_CODE_OAUTH_TOKEN": "${localEnv:CLAUDE_CODE_OAUTH_TOKEN}"
   },
 
-  "postCreateCommand": "pip install --no-cache-dir -r requirements.txt && npm install -g @anthropic-ai/claude-code && pre-commit install",
+  // Persists Claude Code config/login across container rebuilds.
+  "mounts": [
+    "source=docker-revanced-claude-config,target=/home/vscode/.claude,type=volume"
+  ],
+
+  "postCreateCommand": "pip install --no-cache-dir -r requirements.txt && pre-commit install",
 
   "customizations": {
     "vscode": {
