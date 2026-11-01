@@ -33,12 +33,14 @@ CLOAK_NETWORK_IDLE_TIMEOUT_MS = 15_000
 CLOAK_REQUEST_TIMEOUT_MS = request_timeout * 1000
 HTTP_NOT_FOUND = 404
 # APKMirror sometimes returns challenge HTML with HTTP 200, so the body needs explicit marker detection.
+# Deliberately excludes bare "captcha" and "challenge-platform": real APKMirror release pages embed a reCAPTCHA
+# script and Cloudflare's passive `/cdn-cgi/challenge-platform/scripts/jsd/main.js` beacon, so those strings made
+# fully loaded pages (title, variants table and all) look like challenges and every lookup failed. Genuine
+# interstitials are still caught by their title/body text and `cf-chl` tokens below.
 CLOAK_CHALLENGE_MARKERS = (
     "attention required",
-    "captcha",
     "cf-chl",
     "cf-turnstile",
-    "challenge-platform",
     "checking if the site connection is secure",
     "checking your browser",
     "just a moment",
@@ -140,7 +142,16 @@ class ApkMirror(Downloader):
                 logger.debug("CloakBrowser instance was already closed during cleanup.")
 
         if ApkMirror._is_cloudflare_challenge(source):
-            msg = "APKMirror still returned a Cloudflare challenge after CloakBrowser loaded the page."
+            # Report which markers matched and the page title so a false positive (real page that merely embeds a
+            # marker string) can be told apart from a genuine interstitial straight from the CI log.
+            lowered_source = source.lower()
+            matched = [marker for marker in CLOAK_CHALLENGE_MARKERS if marker in lowered_source]
+            title_tag = BeautifulSoup(source, bs4_parser).find("title")
+            title = title_tag.get_text(strip=True) if title_tag else "<no title>"
+            msg = (
+                "APKMirror still returned a Cloudflare challenge after CloakBrowser loaded the page "
+                f"(matched markers: {matched}; page title: {title!r}; size: {len(source)} bytes)."
+            )
             raise APKMirrorAPKDownloadError(msg, url=url) from cause
         return source
 
@@ -352,6 +363,10 @@ class ApkMirror(Downloader):
         "twitter": ("x", "twitter"),
         # TikTok's listing slug is long, but its release slugs are just 'tiktok-<version>-release'.
         "tik-tok-including-musical-ly": ("tiktok", "tik-tok-including-musical-ly"),
+        # The Instagram listing lives at `/instagram-instagram/` but its release slugs are `instagram-<version>-release`
+        # (not `instagram-instagram-<version>-release`). Without this alias the direct URL guess always misses, and the
+        # 3-page listing fallback cannot reach older builds because Instagram publishes many versions per week.
+        "instagram-instagram": ("instagram", "instagram-instagram"),
     }
 
     @classmethod
@@ -406,9 +421,10 @@ class ApkMirror(Downloader):
                     logger.debug(f"Direct URL resolved for {app.app_name} {version}: {guessed_url}")
                     return guessed_url
                 logger.debug(f"Guessed URL {guessed_url} loaded but has no variants table; trying next candidate.")
-            except (APKMirrorAPKDownloadError, ScrapingError):
+            except (APKMirrorAPKDownloadError, ScrapingError) as exc:
                 # The guessed URL returned a non-200 or challenge page; fall through to next candidate.
-                logger.debug(f"Guessed URL {guessed_url} failed; trying next candidate.")
+                # The cause is logged because swallowing it hid why every APKMirror lookup failed on CI.
+                logger.warning(f"Guessed URL {guessed_url} failed ({exc}); trying next candidate.")
         return None
 
     def _scrape_listing_version_page(self: Self, app: APP, version: str) -> str:
@@ -420,8 +436,9 @@ class ApkMirror(Downloader):
             page_url = app.download_source if page_num == 1 else f"{base_listing_url}/page/{page_num}/"
             try:
                 versions_div = self._extracted_search_div(page_url, "listWidget p-relative")
-            except (APKMirrorAPKDownloadError, ScrapingError):
+            except (APKMirrorAPKDownloadError, ScrapingError) as exc:
                 # Network or scraping failure on subsequent pages stops pagination early.
+                logger.warning(f"APKMirror listing page {page_url} failed ({exc}); stopping pagination.")
                 break
 
             if versions_div is None:
