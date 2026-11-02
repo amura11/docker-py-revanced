@@ -23,8 +23,9 @@
   },
 
   // Persists Claude Code config/login across container rebuilds.
+  // ${devcontainerId} is unique per container, so no per-project slug is needed.
   "mounts": [
-    "source=docker-revanced-claude-config,target=/home/vscode/.claude,type=volume"
+    "source=claude-config-${devcontainerId},target=/home/vscode/.claude,type=volume"
   ],
 
   "postCreateCommand": "pip install --no-cache-dir -r requirements.txt && pre-commit install",
@@ -35,9 +36,16 @@
         "ms-python.python",
         "charliermarsh.ruff",
         "ms-python.mypy-type-checker",
+        "esbenp.prettier-vscode",
         "Anthropic.claude-code",
         "streetsidesoftware.code-spell-checker"
-      ]
+      ],
+      "settings": {
+        "editor.formatOnSave": false,
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+      }
     }
-  }
+  },
+
+  "remoteUser": "vscode"
 }
